@@ -10,10 +10,11 @@ on:
   push:
     branches:
       - '**'
-    paths-ignore:
-      - '!.github/workflows/build.yaml'
-      - '.github/**'
-      - 'docs/**'
+    paths:
+      - '**'
+      - '!.github/**'
+      - '.github/workflows/build.yaml'
+      - '!docs/**'
   workflow_dispatch:
     inputs:
       postfix:
