@@ -11,6 +11,7 @@ on:
     branches:
       - '**'
     paths-ignore:
+      - '!.github/workflows/build.yaml'
       - '.github/**'
       - 'docs/**'
   workflow_dispatch:
