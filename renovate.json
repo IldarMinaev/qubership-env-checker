@@ -2,5 +2,32 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "schedule": [
+    "every Monday"
+  ],
+  "docker": {
+      "pinDigests": true
+  },
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "schedule": ["at any time"]
+  },
+  "packageRules": [
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["debian", "kubectl", "yq", "micromamba", "conda", "run-one", "jupyterlab-lsp", "jupyter-lsp", "jupyterhub", "jupyterlab", "nodejs", "aiohttp", "fonttools", "jupyter_server", "pillow", "pyarrow", "urllib3"],
+      "enabled": true,
+      "rangeStrategy": "bump"
+    },
+    {
+      "matchFiles": ["Dockerfile"],
+      "matchStrings": ["ARG PYTHON_VERSION"],
+      "enabled": true,
+      "automerge": false
+    }
   ]
 }
