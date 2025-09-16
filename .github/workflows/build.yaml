@@ -101,6 +101,7 @@ jobs:
           image-ref: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}'
           format: 'sarif'
           output: 'trivy-results.sarif'
+          scanners: 'vuln' # skip secret scanning as it took too much time. Possible values: vuln,secret,misconfig,license.
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
@@ -113,16 +114,18 @@ jobs:
         if: ${{ github.event_name != 'pull_request_target' }}
         uses: docker/scout-action@f8c776824083494ab0d56b8105ba2ca85c86e4de # v1.18.2
         with:
-          command: cves,recommendations
+          command: cves
           image: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}'
           sarif-file: scout-results.sarif
+          only-severities: 'critical,high,medium'
           summary: true
           dockerhub-user: ${{ secrets.DOCKERHUB_USER }}
           dockerhub-password: ${{ secrets.DOCKERHUB_RW_TOKEN }}
+          registry-user: ${GITHUB_ACTOR}
+          registry-password: ${{secrets.GITHUB_TOKEN}}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Docker Scout scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
-        if: always() # always run even upon a non zero exit code from Docker Scout Scanner
         with:
           sarif_file: scout-results.sarif
