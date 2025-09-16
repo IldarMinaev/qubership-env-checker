@@ -91,8 +91,8 @@ jobs:
           platforms: linux/amd64
           push: "${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}"
           tags: |
-            'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}'
-            'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}'
+            ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}
+            ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}
           provenance: false
 
       - name: Run Trivy vulnerability scanner
