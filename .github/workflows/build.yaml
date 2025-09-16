@@ -117,6 +117,7 @@ jobs:
           command: cves
           image: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}'
           sarif-file: scout-results.sarif
+          only-severities: 'critical,high,medium'
           summary: true
           dockerhub-user: ${{ secrets.DOCKERHUB_USER }}
           dockerhub-password: ${{ secrets.DOCKERHUB_RW_TOKEN }}
