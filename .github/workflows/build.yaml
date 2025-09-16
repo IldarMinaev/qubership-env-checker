@@ -1,4 +1,5 @@
 name: Build Artifacts
+
 on:
   release:
     types: [created]
@@ -16,12 +17,20 @@ on:
         description: 'Postfix for tag name'
         required: false
 
+permissions:
+  contents: read
+
 env:
   RAW_TAG_NAME: ${{ github.event.release.tag_name != '' && github.event.release.tag_name || github.ref_name }}
   TAG_POSTFIX: ${{ inputs.postfix || '' }}
 
 jobs:
   multiplatform_build:
+    permissions:
+      contents: read         # for actions/checkout to fetch code
+      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
+      actions: read          # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
+      packages: write        # for publishing docker image to ghcr.io registry
     strategy:
       fail-fast: false
       matrix:
@@ -33,16 +42,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${GITHUB_ACTOR}
           password: ${{secrets.GITHUB_TOKEN}}
+
       - name: Compute repository name
         id: owner
         run: |
@@ -50,6 +63,7 @@ jobs:
           OWNER="${OWNER,,}"
           OWNER=$(echo "$OWNER" | sed -E 's/[^a-z0-9._-]+/-/g')
           echo "owner=$OWNER" >> $GITHUB_OUTPUT
+
       - name: Compute image tag
         id: tag
         run: |
@@ -63,13 +77,28 @@ jobs:
             NAME="${NAME}-${POSTFIX}"
           fi
           echo "tag=$NAME" >> $GITHUB_OUTPUT
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           no-cache: true
-          context: ${{ matrix.component.context }}
-          file: ${{ matrix.component.file }}
+          context: '${{ matrix.component.context }}'
+          file: '${{ matrix.component.file }}'
           platforms: linux/amd64
-          push: ${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}
-          tags: ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}
+          push: '${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}'
+          tags: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}'
           provenance: false
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
+        with:
+          image-ref: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}'
+          format: 'template'
+          template: '@/contrib/sarif.tpl'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
