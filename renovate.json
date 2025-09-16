@@ -22,12 +22,21 @@
       "matchPackageNames": ["debian", "kubectl", "yq", "micromamba", "conda", "run-one", "jupyterlab-lsp", "jupyter-lsp", "jupyterhub", "jupyterlab", "nodejs", "aiohttp", "fonttools", "jupyter_server", "pillow", "pyarrow", "urllib3"],
       "enabled": true,
       "rangeStrategy": "bump"
-    },
+    }
+  ],
+    "customManagers": [
     {
-      "matchFiles": ["Dockerfile"],
-      "matchStrings": ["ARG PYTHON_VERSION"],
-      "enabled": true,
-      "automerge": false
+      "customType": "regex",
+      "managerFilePatterns": ["/^Dockerfile$/"],
+      "matchStringsStrategy": "any",
+      "matchStrings": [
+        "ARG PYTHON_VERSION=\"?(?<currentValue>3(?<minor>\\d+))\"?\\s"
+      ],
+      "autoReplaceStringTemplate": "ARG PYTHON_VERSION={{{replace '\\.' '' newValue}}}\n",
+      "currentValueTemplate": "3.{{{minor}}}",
+      "datasourceTemplate": "python-version",
+      "versioningTemplate": "python",
+      "depNameTemplate": "python"
     }
   ]
 }
