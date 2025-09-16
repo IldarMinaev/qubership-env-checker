@@ -7,7 +7,7 @@
     "dependencies"
   ],
   "schedule": [
-    "every Monday"
+    "Weekly on every Monday"
   ],
   "docker": {
       "pinDigests": true
