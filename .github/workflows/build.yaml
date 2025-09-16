@@ -85,7 +85,7 @@ jobs:
           context: '${{ matrix.component.context }}'
           file: '${{ matrix.component.file }}'
           platforms: linux/amd64
-          push: '${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}'
+          push: "${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}"
           tags: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}'
           provenance: false
 
