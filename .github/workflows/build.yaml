@@ -114,7 +114,7 @@ jobs:
         uses: docker/scout-action@f8c776824083494ab0d56b8105ba2ca85c86e4de # v1.18.2
         with:
           command: cves,recommendations
-          image: ${{ steps.meta.outputs.tags }}
+          image: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}'
           sarif-file: scout-results.sarif
           summary: true
           dockerhub-user: ${{ secrets.DOCKERHUB_USER }}
