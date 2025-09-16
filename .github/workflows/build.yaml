@@ -1,9 +1,5 @@
 name: Build Artifacts
 
-permissions:
-  contents: write
-  packages: write
-
 on:
   release:
     types: [created]
