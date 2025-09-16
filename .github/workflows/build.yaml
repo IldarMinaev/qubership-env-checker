@@ -43,6 +43,13 @@ jobs:
           registry: ghcr.io
           username: ${GITHUB_ACTOR}
           password: ${{secrets.GITHUB_TOKEN}}
+      - name: Compute repository name
+        id: owner
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          OWNER="${OWNER,,}"
+          OWNER=$(echo "$OWNER" | sed -E 's/[^a-z0-9._-]+/-/g')
+          echo "owner=$OWNER" >> $GITHUB_OUTPUT
       - name: Compute image tag
         id: tag
         run: |
@@ -64,5 +71,5 @@ jobs:
           file: ${{ matrix.component.file }}
           platforms: linux/amd64
           push: ${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}
-          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}
+          tags: ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}
           provenance: false
