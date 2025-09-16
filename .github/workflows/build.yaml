@@ -78,6 +78,10 @@ jobs:
           fi
           echo "tag=$NAME" >> $GITHUB_OUTPUT
 
+      - name: Get short SHA
+        id: sha
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -86,7 +90,9 @@ jobs:
           file: '${{ matrix.component.file }}'
           platforms: linux/amd64
           push: "${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}"
-          tags: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}'
+          tags: |
+            - 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}'
+            - 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}'
           provenance: false
 
       - name: Run Trivy vulnerability scanner
