@@ -5,9 +5,11 @@ on:
   push:
     branches:
       - '**'
-    paths-ignore:
-      - '.github/**'
-      - 'docs/**'
+    paths:
+      - '**'
+      - '!.github/**'
+      - '.github/workflows/build.yaml'
+      - '!docs/**'
   workflow_dispatch:
     inputs:
       postfix:
