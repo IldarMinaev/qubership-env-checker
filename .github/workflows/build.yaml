@@ -6,11 +6,6 @@ on:
   push:
     branches:
       - '**'
-    paths:
-      - '**'
-      - '!.github/**'
-      - '.github/workflows/build.yaml'
-      - '!docs/**'
   workflow_dispatch:
     inputs:
       postfix:
