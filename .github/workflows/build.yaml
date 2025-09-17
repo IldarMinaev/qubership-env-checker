@@ -39,8 +39,8 @@ jobs:
             file: Dockerfile
             context: .
         platform:
-          - linux/amd64
-          - linux/arm64
+          - amd64
+          - arm64
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -92,7 +92,7 @@ jobs:
           file: '${{ matrix.component.file }}'
           load: true
           no-cache: true
-          platforms: '${{ matrix.platform }}'
+          platforms: 'linux/${{ matrix.platform }}'
           provenance: false
           push: "${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}"
           tags: |
