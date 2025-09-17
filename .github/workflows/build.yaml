@@ -89,30 +89,47 @@ jobs:
           file: '${{ matrix.component.file }}'
           load: true
           no-cache: true
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           provenance: false
           push: "${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}"
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}
             ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}
+            ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}-${{ platform() == 'linux/amd64' && 'amd64' || (platform() == 'linux/arm64' && 'arm64' || 'unknown') }}
+            ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}-${{ platform() == 'linux/amd64' && 'amd64' || (platform() == 'linux/arm64' && 'arm64' || 'unknown') }}
 
-      - name: Run Trivy vulnerability scanner
+      - name: Run Trivy vulnerability scanner (amd64)
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # 0.33.1
         with:
           format: 'sarif'
-          image-ref: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}'
-          output: 'trivy-results.sarif'
-          scanners: 'vuln' # skip secret scanning as it took too much time. Possible values: vuln,secret,misconfig,license.
+          image-ref: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}-amd64'
+          output: 'trivy-results-amd64.sarif'
+          scanners: 'vuln'
           severity: 'CRITICAL,HIGH'
 
-      - name: Upload Trivy scan results to GitHub Security tab
+      - name: Upload Trivy scan results (amd64) to GitHub Security tab
         uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
         if: always() # always run even upon a non zero exit code from Trivy Scanner
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: 'trivy-results-amd64.sarif'
 
-      - name: Run Docker Scout CVEs scanner
-        id: docker-scout-cves
+      - name: Run Trivy vulnerability scanner (arm64)
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # 0.33.1
+        with:
+          format: 'sarif'
+          image-ref: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}-arm64'
+          output: 'trivy-results-arm64.sarif'
+          scanners: 'vuln'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results (arm64) to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-arm64.sarif'
+
+      - name: Run Docker Scout CVEs scanner (amd64)
+        id: docker-scout-cves-amd64
         if: ${{ github.event_name != 'pull_request_target' }}
         uses: docker/scout-action@f8c776824083494ab0d56b8105ba2ca85c86e4de # v1.18.2
         with:
@@ -120,27 +137,61 @@ jobs:
           dockerhub-password: ${{ secrets.DOCKERHUB_RW_TOKEN }}
           dockerhub-user: ${{ secrets.DOCKERHUB_USER }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          image: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}'
+          image: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}-amd64'
           only-severities: 'critical,high'
           registry-password: ${{secrets.GITHUB_TOKEN}}
           registry-user: ${GITHUB_ACTOR}
-          sarif-file: scout-results.sarif
+          sarif-file: scout-results-amd64.sarif
           summary: true
 
-      - name: Upload Docker Scout scan results to GitHub Security tab
+      - name: Upload Docker Scout scan results (amd64) to GitHub Security tab
         uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
         with:
-          sarif_file: scout-results.sarif
+          sarif_file: scout-results-amd64.sarif
 
-      - name: Run Anchore Grype scanner
+      - name: Run Docker Scout CVEs scanner (arm64)
+        id: docker-scout-cves-arm64
+        if: ${{ github.event_name != 'pull_request_target' }}
+        uses: docker/scout-action@f8c776824083494ab0d56b8105ba2ca85c86e4de # v1.18.2
+        with:
+          command: cves
+          dockerhub-password: ${{ secrets.DOCKERHUB_RW_TOKEN }}
+          dockerhub-user: ${{ secrets.DOCKERHUB_USER }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          image: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}-arm64'
+          only-severities: 'critical,high'
+          registry-password: ${{secrets.GITHUB_TOKEN}}
+          registry-user: ${GITHUB_ACTOR}
+          sarif-file: scout-results-arm64.sarif
+          summary: true
+
+      - name: Upload Docker Scout scan results (arm64) to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
+        with:
+          sarif_file: scout-results-arm64.sarif
+
+      - name: Run Anchore Grype scanner (amd64)
         uses: anchore/scan-action@f6601287cdb1efc985d6b765bbf99cb4c0ac29d8 # v7.0.0
         with:
           fail-build: false
-          image: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}'
+          image: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}-amd64'
           output-format: sarif
-          output-file: grype-results.sarif
+          output-file: grype-results-amd64.sarif
 
-      - name: Upload Anchore Grype scan results to GitHub Security tab
+      - name: Upload Anchore Grype scan results (amd64) to GitHub Security tab
         uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
         with:
-          sarif_file: grype-results.sarif
+          sarif_file: grype-results-amd64.sarif
+
+      - name: Run Anchore Grype scanner (arm64)
+        uses: anchore/scan-action@f6601287cdb1efc985d6b765bbf99cb4c0ac29d8 # v7.0.0
+        with:
+          fail-build: false
+          image: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}-arm64'
+          output-format: sarif
+          output-file: grype-results-arm64.sarif
+
+      - name: Upload Anchore Grype scan results (arm64) to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
+        with:
+          sarif_file: grype-results-arm64.sarif
