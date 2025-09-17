@@ -117,8 +117,6 @@ jobs:
           sarif_file: 'trivy-results-${{ matrix.platform }}.sarif'
 
       - name: Run Docker Scout CVEs scanner (${{ matrix.platform }})
-        id: docker-scout-cves-${{ matrix.platform }}
-        if: ${{ github.event_name != 'pull_request_target' }}
         uses: docker/scout-action@f8c776824083494ab0d56b8105ba2ca85c86e4de # v1.18.2
         with:
           command: cves
