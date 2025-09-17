@@ -52,9 +52,9 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
         with:
+          password: ${{secrets.GITHUB_TOKEN}}
           registry: ghcr.io
           username: ${GITHUB_ACTOR}
-          password: ${{secrets.GITHUB_TOKEN}}
 
       - name: Compute repository name
         id: owner
@@ -91,17 +91,18 @@ jobs:
           platforms: linux/amd64
           push: "${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}"
           tags: |
-            ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}
             ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}
+            ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}
           provenance: false
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # 0.33.1
         with:
-          image-ref: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}'
           format: 'sarif'
+          image-ref: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}'
           output: 'trivy-results.sarif'
           scanners: 'vuln' # skip secret scanning as it took too much time. Possible values: vuln,secret,misconfig,license.
+          severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
@@ -115,15 +116,15 @@ jobs:
         uses: docker/scout-action@f8c776824083494ab0d56b8105ba2ca85c86e4de # v1.18.2
         with:
           command: cves
-          image: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}'
-          sarif-file: scout-results.sarif
-          only-severities: 'critical,high,medium'
-          summary: true
-          dockerhub-user: ${{ secrets.DOCKERHUB_USER }}
           dockerhub-password: ${{ secrets.DOCKERHUB_RW_TOKEN }}
-          registry-user: ${GITHUB_ACTOR}
-          registry-password: ${{secrets.GITHUB_TOKEN}}
+          dockerhub-user: ${{ secrets.DOCKERHUB_USER }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          image: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}'
+          only-severities: 'critical,high'
+          registry-password: ${{secrets.GITHUB_TOKEN}}
+          registry-user: ${GITHUB_ACTOR}
+          sarif-file: scout-results.sarif
+          summary: true
 
       - name: Upload Docker Scout scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
