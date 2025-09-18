@@ -82,7 +82,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
-          images: ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}
+          images: "ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}"
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -205,6 +205,14 @@ jobs:
     needs:
       - multiplatform_build
     steps:
+      - name: Compute repository name
+        id: owner
+        run: |
+          OWNER="${{ github.repository_owner }}"
+          OWNER="${OWNER,,}"
+          OWNER=$(echo "$OWNER" | sed -E 's/[^a-z0-9._-]+/-/g')
+          echo "owner=$OWNER" >> $GITHUB_OUTPUT
+
       - name: Download digests
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
@@ -226,7 +234,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
-          images: ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}
+          images: "ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}"
           tags: |
             type=ref,event=branch
             type=ref,event=pr
