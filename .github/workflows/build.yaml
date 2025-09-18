@@ -114,9 +114,9 @@ jobs:
           context: '${{ matrix.component.context }}'
           file: '${{ matrix.component.file }}'
           labels: ${{ steps.meta.outputs.labels }}
-          load: true
+          # load: true
           no-cache: true
-          outputs: type=image,push-by-digest=true,name-canonical=true
+          outputs: type=image,name-canonical=true # push-by-digest=true,
           platforms: 'linux/${{ matrix.platform }}'
           provenance: false
           push: "${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}"
@@ -249,9 +249,9 @@ jobs:
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}@sha256:%s ' *)
+          docker buildx imagetools create "$(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")" \
+            "$(printf 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}@sha256:%s ' *)"
 
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect "ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.meta.outputs.version }}"
