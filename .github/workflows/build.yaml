@@ -11,18 +11,10 @@ on:
       - '!.github/**'
       - '.github/workflows/build.yaml'
       - '!docs/**'
-  workflow_dispatch:
-    inputs:
-      postfix:
-        description: 'Postfix for tag name'
-        required: false
+  workflow_dispatch: {}
 
 permissions:
   contents: read
-
-env:
-  RAW_TAG_NAME: ${{ github.event.release.tag_name != '' && github.event.release.tag_name || github.ref_name }}
-  TAG_POSTFIX: ${{ inputs.postfix || '' }}
 
 jobs:
   multiplatform_build:
@@ -51,37 +43,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - name: Compute repository name
-        id: owner
-        run: |
-          OWNER="${{ github.repository_owner }}"
-          OWNER="${OWNER,,}"
-          OWNER=$(echo "$OWNER" | sed -E 's/[^a-z0-9._-]+/-/g')
-          echo "owner=$OWNER" >> $GITHUB_OUTPUT
-
-      - name: Compute image tag
-        id: tag
-        run: |
-          NAME="${RAW_TAG_NAME}"
-          # sanitize to be a valid docker tag: lowercase, replace invalid chars, max length 128
-          NAME="${NAME,,}"
-          NAME=$(echo "$NAME" | sed -E 's/[^a-z0-9._-]+/-/g')
-          # optional postfix
-          if [ -n "${TAG_POSTFIX}" ]; then
-            POSTFIX=$(echo "${TAG_POSTFIX}" | sed -E 's/[^a-z0-9._-]+/-/g')
-            NAME="${NAME}-${POSTFIX}"
-          fi
-          echo "tag=$NAME" >> $GITHUB_OUTPUT
-
       - name: Set image name
         run: |
-          echo "FULL_IMAGE_NAME=ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}" >>${GITHUB_ENV}
+          OWNER="${{ github.repository_owner }}"
+          OWNER=$(echo "${OWNER,,}" | sed -E 's/[^a-z0-9._-]+/-/g')
+          echo "FULL_IMAGE_NAME=ghcr.io/${OWNER}/${{ matrix.component.name }}" >>${GITHUB_ENV}
         env:
           IMAGE_NAME: '${{ github.repository }}'
-
-      - name: Get short SHA
-        id: sha
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Docker meta
         id: meta
@@ -130,12 +98,14 @@ jobs:
             BUILD_HASH=${{ github.sha }}
 
       - name: Export digest
+        if: ${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}
         run: |
           mkdir -p ${{ runner.temp }}/digests
           digest="${{ steps.build.outputs.digest }}"
           echo "${{ matrix.platform.name }}" > "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload digest
+        if: ${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: digests-${{ matrix.component.name }}-${{ matrix.platform.name }}
@@ -171,7 +141,9 @@ jobs:
 
       - name: Set image name
         run: |
-          echo "FULL_IMAGE_NAME=ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}" >>${GITHUB_ENV}
+          OWNER="${{ github.repository_owner }}"
+          OWNER=$(echo "${OWNER,,}" | sed -E 's/[^a-z0-9._-]+/-/g')
+          echo "FULL_IMAGE_NAME=ghcr.io/${OWNER}/${{ matrix.component.name }}" >>${GITHUB_ENV}
         env:
           IMAGE_NAME: '${{ github.repository }}'
 
