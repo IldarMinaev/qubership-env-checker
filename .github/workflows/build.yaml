@@ -40,16 +40,19 @@ jobs:
             description: Environments Checker Base image
             file: Dockerfile
         platform:
-          - amd64
-          - arm64
-    runs-on: ubuntu-latest
+          # For runners details see https://docs.github.com/en/actions/concepts/runners/github-hosted-runners#runner-images
+          - name: amd64
+            runner: ubuntu-latest
+          - name: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Prepare for multiplatform build
         run: |
-          platform=${{ matrix.platform }}
+          platform=${{ matrix.platform.name }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
 
       - name: Compute repository name
@@ -74,6 +77,12 @@ jobs:
           fi
           echo "tag=$NAME" >> $GITHUB_OUTPUT
 
+      - name: Set image name
+        run: |
+          echo "FULL_IMAGE_NAME=ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}" >>${GITHUB_ENV}
+        env:
+          IMAGE_NAME: '${{ github.repository }}'
+
       - name: Get short SHA
         id: sha
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
@@ -82,17 +91,15 @@ jobs:
         id: meta
         uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
-          images: "ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}"
+          images: "${{ env.FULL_IMAGE_NAME }}"
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
+            type=ref,event=tag
+            type=sha,prefix=git-
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-          labels: |
-            org.opencontainers.image.authors="qubership.org"
-            org.opencontainers.image.description=${{ matrix.component.description }}
-            org.opencontainers.image.source="https://github.com/${{ github.repository }}"
-            org.opencontainers.image.title=${{ matrix.component.name }}
+          flavor: |
+            latest=${{ github.ref == 'refs/heads/main' }}
 
       - name: Login to Docker Registry
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
@@ -116,15 +123,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # load: true
           no-cache: true
-          outputs: type=image,name-canonical=true # push-by-digest=true,
-          platforms: 'linux/${{ matrix.platform }}'
+          outputs: type=image,name=${{ env.FULL_IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          platforms: 'linux/${{ matrix.platform.name }}'
           provenance: false
           push: "${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}"
-          tags: |
-            ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}
-            ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}
-            ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}-${{ matrix.platform }}
-            ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.tag.outputs.tag }}-${{ matrix.platform }}
+          build-args: |
+            BUILD_HASH=${{ github.sha }}
 
       - name: Export digest
         run: |
@@ -135,57 +139,10 @@ jobs:
       - name: Upload digest
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: digests-${{ env.PLATFORM_PAIR }}
+          name: digests-${{ matrix.component.name }}-${{ env.PLATFORM_PAIR }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
-
-      - name: Run Trivy vulnerability scanner (${{ matrix.platform }})
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # 0.33.1
-        with:
-          format: 'sarif'
-          image-ref: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}-${{ matrix.platform }}'
-          output: 'trivy-results-${{ matrix.platform }}.sarif'
-          scanners: 'vuln'
-          severity: 'CRITICAL,HIGH'
-
-      - name: Upload Trivy scan results (${{ matrix.platform }}) to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
-        if: always() # always run even upon a non zero exit code from Trivy Scanner
-        with:
-          sarif_file: 'trivy-results-${{ matrix.platform }}.sarif'
-
-      - name: Run Docker Scout CVEs scanner (${{ matrix.platform }})
-        uses: docker/scout-action@f8c776824083494ab0d56b8105ba2ca85c86e4de # v1.18.2
-        with:
-          command: cves
-          dockerhub-password: ${{ secrets.DOCKERHUB_RW_TOKEN }}
-          dockerhub-user: ${{ secrets.DOCKERHUB_USER }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          image: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}-${{ matrix.platform }}'
-          only-severities: 'critical,high'
-          registry-password: ${{secrets.GITHUB_TOKEN}}
-          registry-user: ${GITHUB_ACTOR}
-          sarif-file: scout-results-${{ matrix.platform }}.sarif
-          summary: true
-
-      - name: Upload Docker Scout scan results (${{ matrix.platform }}) to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
-        with:
-          sarif_file: scout-results-${{ matrix.platform }}.sarif
-
-      - name: Run Anchore Grype scanner (${{ matrix.platform }})
-        uses: anchore/scan-action@f6601287cdb1efc985d6b765bbf99cb4c0ac29d8 # v7.0.0
-        with:
-          fail-build: false
-          image: 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.sha.outputs.sha_short }}-${{ matrix.platform }}'
-          output-format: sarif
-          output-file: grype-results-${{ matrix.platform }}.sarif
-
-      - name: Upload Anchore Grype scan results (${{ matrix.platform }}) to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
-        with:
-          sarif_file: grype-results-${{ matrix.platform }}.sarif
 
   merge:
     permissions:
@@ -213,11 +170,17 @@ jobs:
           OWNER=$(echo "$OWNER" | sed -E 's/[^a-z0-9._-]+/-/g')
           echo "owner=$OWNER" >> $GITHUB_OUTPUT
 
+      - name: Set image name
+        run: |
+          echo "FULL_IMAGE_NAME=ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}" >>${GITHUB_ENV}
+        env:
+          IMAGE_NAME: '${{ github.repository }}'
+
       - name: Download digests
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digests-*
+          pattern: digests-${{ matrix.component.name }}-*
           merge-multiple: true
 
       - name: Login to Docker Registry
@@ -234,24 +197,22 @@ jobs:
         id: meta
         uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
-          images: "ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}"
+          images: "${{ env.FULL_IMAGE_NAME }}"
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
+            type=ref,event=tag
+            type=sha,prefix=git-
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-          labels: |
-            org.opencontainers.image.authors="qubership.org"
-            org.opencontainers.image.description=${{ matrix.component.description }}
-            org.opencontainers.image.source="https://github.com/${{ github.repository }}"
-            org.opencontainers.image.title=${{ matrix.component.name }}
+          flavor: |
+            latest=${{ github.ref == 'refs/heads/main' }}
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
         run: |
           docker buildx imagetools create "$(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")" \
-            "$(printf 'ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}@sha256:%s ' *)"
+            "$(printf '${{ env.FULL_IMAGE_NAME }}@sha256:%s ' *)"
 
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect "ghcr.io/${{ steps.owner.outputs.owner }}/${{ matrix.component.name }}:${{ steps.meta.outputs.version }}"
+          docker buildx imagetools inspect "${{ env.FULL_IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
