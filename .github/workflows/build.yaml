@@ -100,6 +100,8 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
           flavor: |
             latest=${{ github.ref == 'refs/heads/main' }}
+          labels: |
+            org.opencontainers.image.description=${{ matrix.component.description }}
 
       - name: Login to Docker Registry
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
@@ -123,7 +125,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # load: true
           no-cache: true
-          outputs: type=image,name=${{ env.FULL_IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          # More options: https://github.com/moby/buildkit/blob/master/README.md#output
+          outputs: type=image,name=${{ env.FULL_IMAGE_NAME }},push-by-digest=true,name-canonical=true
+          tags: ${{ env.FULL_IMAGE_NAME }}:git-${{ github.sha }}-${{ matrix.platform.name }}
           platforms: 'linux/${{ matrix.platform.name }}'
           provenance: false
           push: "${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}"
@@ -206,6 +210,8 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
           flavor: |
             latest=${{ github.ref == 'refs/heads/main' }}
+          labels: |
+            org.opencontainers.image.description=${{ matrix.component.description }}
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
@@ -217,3 +223,4 @@ jobs:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect "${{ env.FULL_IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
+
