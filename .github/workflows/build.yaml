@@ -1,3 +1,4 @@
+# Set repository variable PUBLISH_DOCKER_IMAGES to `true`, if you want to publish docker images to ghcr.io
 name: Build Artifacts
 
 on:
@@ -31,13 +32,17 @@ jobs:
             context: .
             description: Environments Checker Base image
             file: Dockerfile
+          - name: qubership-test
+            context: .
+            description: test image
+            file: Dockerfile-test
         platform:
           # Platform name should be without `linux-` prefix.
           # For runners details see https://docs.github.com/en/actions/concepts/runners/github-hosted-runners#runner-images
           - name: amd64
             runner: ubuntu-latest
           - name: arm64
-            runner: ubuntu-latest # For some reason, build on ubuntu-24.04-arm took too much time.
+            runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.platform.runner }}
     steps:
       - name: Checkout
@@ -66,6 +71,8 @@ jobs:
             latest=${{ github.ref == 'refs/heads/main' }}
           labels: |
             org.opencontainers.image.description=${{ matrix.component.description }}
+          annotations: |
+            org.opencontainers.image.description=${{ matrix.component.description }}
 
       - name: Login to Docker Registry
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
@@ -73,9 +80,6 @@ jobs:
           password: ${{secrets.GITHUB_TOKEN}}
           registry: ghcr.io
           username: ${GITHUB_ACTOR}
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
@@ -87,6 +91,7 @@ jobs:
           context: '${{ matrix.component.context }}'
           file: '${{ matrix.component.file }}'
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
           # load: true
           no-cache: true
           # More options for outputs: https://github.com/moby/buildkit/blob/master/README.md#output
@@ -95,7 +100,7 @@ jobs:
           provenance: false
           push: "${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}"
           build-args: |
-            BUILD_HASH=${{ github.sha }}
+            BUILDPLATFORM=linux/${{ matrix.platform.name }}
 
       - name: Export digest
         if: ${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}
@@ -178,6 +183,8 @@ jobs:
           flavor: |
             latest=${{ github.ref == 'refs/heads/main' }}
           labels: |
+            org.opencontainers.image.description=${{ matrix.component.description }}
+          annotations: |
             org.opencontainers.image.description=${{ matrix.component.description }}
 
       - name: Create manifest list for multiplatform images and push
