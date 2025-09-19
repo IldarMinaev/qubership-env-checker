@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   CLAAssistant:
-    if: github.event.pull_request.draft == false && github.repository.owner.login == 'Netcracker'
+    if: github.event.pull_request.draft == false && github.repository_owner == 'Netcracker'
     permissions:
       actions: write
       contents: write
@@ -19,7 +19,8 @@ jobs:
       statuses: write
     runs-on: ubuntu-latest
     steps:
-      - run: |
+      - name: test data
+        run: |
           echo "Event name: ${{ github.event_name }}"
           echo "Comment body: ${{ github.event.comment.body }}"
           echo "Is PR draft: ${{ github.event.pull_request.draft }}"
