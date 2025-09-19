@@ -121,7 +121,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # load: true
           no-cache: true
-          # More options: https://github.com/moby/buildkit/blob/master/README.md#output
+          # More options for outputs: https://github.com/moby/buildkit/blob/master/README.md#output
           outputs: type=image,name=${{ env.FULL_IMAGE_NAME }},push-by-digest=true,name-canonical=true
           platforms: 'linux/${{ matrix.platform.name }}'
           provenance: false
@@ -144,6 +144,11 @@ jobs:
           retention-days: 1
 
   merge:
+    name: Merge digests and create manifest for multiplatform images
+    if: ${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}
+    needs:
+      - multiplatform_build
+    runs-on: ubuntu-latest
     permissions:
       contents: read    # Required to read repository contents for docker/metadata-action
       packages: write   # Required to push Docker images to GitHub Container Registry (ghcr.io)
@@ -155,9 +160,6 @@ jobs:
             context: .
             description: Environments Checker Base image
             file: Dockerfile
-    runs-on: ubuntu-latest
-    needs:
-      - multiplatform_build
     steps:
       - name: Compute repository name
         id: owner
@@ -214,7 +216,6 @@ jobs:
             $(printf '${{ env.FULL_IMAGE_NAME }}@sha256:%s ' *)
 
       - name: Create additional platform tags for each digest image and push
-        if: ${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}
         working-directory: ${{ runner.temp }}/digests
         run: |
           for digest_file in *; do
