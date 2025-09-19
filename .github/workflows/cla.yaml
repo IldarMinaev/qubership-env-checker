@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   CLAAssistant:
-    if: github.event.pull_request.draft == false && github.repository_owner == 'Netcracker'
+    if: github.event.pull_request.draft == false && github.repository.owner.login == 'Netcracker'
     permissions:
       actions: write
       contents: write
