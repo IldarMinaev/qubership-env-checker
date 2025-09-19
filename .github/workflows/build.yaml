@@ -40,6 +40,7 @@ jobs:
             description: Environments Checker Base image
             file: Dockerfile
         platform:
+          # Platform name should be without `linux-` prefix.
           # For runners details see https://docs.github.com/en/actions/concepts/runners/github-hosted-runners#runner-images
           - name: amd64
             runner: ubuntu-latest
@@ -49,11 +50,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-
-      - name: Prepare for multiplatform build
-        run: |
-          platform=${{ matrix.platform.name }}
-          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
 
       - name: Compute repository name
         id: owner
@@ -127,7 +123,6 @@ jobs:
           no-cache: true
           # More options: https://github.com/moby/buildkit/blob/master/README.md#output
           outputs: type=image,name=${{ env.FULL_IMAGE_NAME }},push-by-digest=true,name-canonical=true
-          tags: ${{ env.FULL_IMAGE_NAME }}:git-${{ github.sha }}-${{ matrix.platform.name }}
           platforms: 'linux/${{ matrix.platform.name }}'
           provenance: false
           push: "${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}"
@@ -138,12 +133,12 @@ jobs:
         run: |
           mkdir -p ${{ runner.temp }}/digests
           digest="${{ steps.build.outputs.digest }}"
-          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+          echo "${{ matrix.platform.name }}" > "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload digest
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: digests-${{ matrix.component.name }}-${{ env.PLATFORM_PAIR }}
+          name: digests-${{ matrix.component.name }}-${{ matrix.platform.name }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -220,7 +215,19 @@ jobs:
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.FULL_IMAGE_NAME }}@sha256:%s ' *)
 
+      - name: Create additional tags for each platform
+        if: ${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          for digest_file in *; do
+            digest=$(basename "$digest_file")
+            platform=$(cat "$digest_file")
+            for tag in $(jq -cr '.tags | map(. + "-'${platform}'") | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") ; do
+              docker tag "${{ env.FULL_IMAGE_NAME }}@sha256:$digest" $tag
+              docker push "$tag"
+            done
+          done
+
       - name: Inspect image
         run: |
           docker buildx imagetools inspect "${{ env.FULL_IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
-
