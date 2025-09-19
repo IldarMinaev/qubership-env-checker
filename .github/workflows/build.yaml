@@ -28,8 +28,8 @@ jobs:
   multiplatform_build:
     permissions:
       actions: read          # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
-      contents: read         # for actions/checkout to fetch code
-      packages: write        # for publishing docker image to ghcr.io registry
+      contents: read         # for actions/checkout and docker/metadata-action
+      packages: write        # to push Docker images to GitHub Container Registry (ghcr.io)
       security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
     strategy:
       fail-fast: false
@@ -45,7 +45,7 @@ jobs:
           - name: amd64
             runner: ubuntu-latest
           - name: arm64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-latest # For some reason, build on ubuntu-24.04-arm took too much time.
     runs-on: ${{ matrix.platform.runner }}
     steps:
       - name: Checkout
@@ -145,10 +145,8 @@ jobs:
 
   merge:
     permissions:
-      actions: read
-      contents: read
-      packages: write
-      security-events: write
+      contents: read    # Required to read repository contents for docker/metadata-action
+      packages: write   # Required to push Docker images to GitHub Container Registry (ghcr.io)
     strategy:
       fail-fast: false
       matrix:
@@ -208,14 +206,14 @@ jobs:
           labels: |
             org.opencontainers.image.description=${{ matrix.component.description }}
 
-      - name: Create manifest list and push
+      - name: Create manifest list for multiplatform images and push
         working-directory: ${{ runner.temp }}/digests
         run: |
           # shellcheck disable=SC2046
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.FULL_IMAGE_NAME }}@sha256:%s ' *)
 
-      - name: Create additional tags for each platform
+      - name: Create additional platform tags for each digest image and push
         if: ${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}
         working-directory: ${{ runner.temp }}/digests
         run: |
@@ -223,8 +221,7 @@ jobs:
             digest=$(basename "$digest_file")
             platform=$(cat "$digest_file")
             for tag in $(jq -cr '.tags | map(. + "-'${platform}'") | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") ; do
-              docker tag "${{ env.FULL_IMAGE_NAME }}@sha256:$digest" $tag
-              docker push "$tag"
+              docker buildx imagetools create "${{ env.FULL_IMAGE_NAME }}@sha256:$digest" --tag "${tag}"
             done
           done
 
