@@ -38,7 +38,7 @@ jobs:
           - name: amd64
             runner: ubuntu-latest
           - name: arm64
-            runner: ubuntu-latest # For some reason, build on ubuntu-24.04-arm took too much time.
+            runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.platform.runner }}
     steps:
       - name: Checkout
@@ -99,7 +99,7 @@ jobs:
           provenance: false
           push: "${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}"
           build-args: |
-            BUILDPLATFORM='linux/${{ matrix.platform.name }}'
+            BUILDPLATFORM=linux/${{ matrix.platform.name }}
 
       - name: Export digest
         if: ${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}
