@@ -1,3 +1,4 @@
+# Set repository variable PUBLISH_DOCKER_IMAGES to `true`, if you want to publish docker images to ghcr.io
 name: Build Artifacts
 
 on:
@@ -66,6 +67,8 @@ jobs:
             latest=${{ github.ref == 'refs/heads/main' }}
           labels: |
             org.opencontainers.image.description=${{ matrix.component.description }}
+          annotations: |
+            org.opencontainers.image.description=${{ matrix.component.description }}
 
       - name: Login to Docker Registry
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
@@ -87,6 +90,7 @@ jobs:
           context: '${{ matrix.component.context }}'
           file: '${{ matrix.component.file }}'
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
           # load: true
           no-cache: true
           # More options for outputs: https://github.com/moby/buildkit/blob/master/README.md#output
@@ -95,7 +99,7 @@ jobs:
           provenance: false
           push: "${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}"
           build-args: |
-            BUILD_HASH=${{ github.sha }}
+            BUILDPLATFORM='linux/${{ matrix.platform.name }}'
 
       - name: Export digest
         if: ${{ vars.PUBLISH_DOCKER_IMAGES == 'true' }}
@@ -178,6 +182,8 @@ jobs:
           flavor: |
             latest=${{ github.ref == 'refs/heads/main' }}
           labels: |
+            org.opencontainers.image.description=${{ matrix.component.description }}
+          annotations: |
             org.opencontainers.image.description=${{ matrix.component.description }}
 
       - name: Create manifest list for multiplatform images and push
