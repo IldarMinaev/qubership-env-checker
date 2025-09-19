@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   CLAAssistant:
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false && github.repository_owner == 'Netcracker'
     permissions:
       actions: write
       contents: write
@@ -19,6 +19,14 @@ jobs:
       statuses: write
     runs-on: ubuntu-latest
     steps:
+      - name: test data
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Comment body: ${{ github.event.comment.body }}"
+          echo "Is PR draft: ${{ github.event.pull_request.draft }}"
+          echo "Repository owner: ${{ github.repository_owner }}"
+          echo "Is repository owner login: ${{ github.repository.owner.login }}"
+          echo "Repository: ${{ github.repository }}"
       - name: "CLA Assistant"
         if: (github.event.comment.body == 'recheck' || github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') || github.event_name == 'pull_request_target'
         uses: contributor-assistant/github-action@v2.6.1
